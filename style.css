@@ -1,0 +1,434 @@
+/* ============================================================
+   Pixel, ASCII & Dither Art Generator — Blauw Films
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+/* Reset scoped to generator */
+.pxl-gen *, .pxl-gen *::before, .pxl-gen *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---- Root container ---- */
+.pxl-gen {
+  width: 100%;
+  font-family: 'Roboto', sans-serif;
+  background: #f9f9f9;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.pxl-gen .pxl-wrap {
+  background: #ececec;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  padding: 24px;
+  width: 100%;
+}
+
+/* ---- Typography ---- */
+.pxl-gen h4.h4-rich-text-title {
+  font-weight: 300;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.pxl-gen .rich-text-blauw-films {
+  font-size: 0.875rem;
+  color: #4a4a4a;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.pxl-gen .pxl-subtitle {
+  margin-bottom: 20px;
+}
+
+/* ---- Form elements ---- */
+.pxl-gen .form-field {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  background: #fff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.875rem;
+  color: #1a1a1a;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.pxl-gen .form-field:focus {
+  border-color: #1451eb;
+}
+
+/* ---- Buttons ---- */
+.pxl-gen .dash_button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  background: #1451eb;
+  color: #fff;
+  border: none;
+  border-radius: 1px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.pxl-gen .dash_button:hover { background: #112347; }
+.pxl-gen .dash_button:disabled { opacity: 0.4; cursor: not-allowed; }
+.pxl-gen .dash_button.secondary {
+  background: transparent;
+  color: #1a1a1a;
+  border: 1px solid #dadada;
+}
+.pxl-gen .dash_button.secondary:hover { background: #dadada; }
+.pxl-gen .dash_button.sm { padding: 6px 12px; font-size: 0.8rem; }
+.pxl-gen .dash_button.danger { background: #c0392b; }
+.pxl-gen .dash_button.danger:hover { background: #96281b; }
+.pxl-gen .dash_button.icon-btn {
+  padding: 6px 10px;
+  font-size: 1rem;
+  min-width: 34px;
+}
+
+/* ---- Upload area ---- */
+.pxl-upload {
+  border: 2px dashed #dadada;
+  border-radius: 1px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.pxl-upload:hover,
+.pxl-upload.dragover {
+  border-color: #1451eb;
+  background: rgba(20, 81, 235, 0.03);
+}
+.pxl-upload input[type="file"] { display: none; }
+.pxl-upload-icon { font-size: 2rem; color: #aaa; margin-bottom: 8px; }
+
+.pxl-file-info {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.pxl-file-info span { font-size: 0.8rem; color: #666; }
+
+/* ---- Mode selector ---- */
+.pxl-modes { display: flex; gap: 8px; margin: 20px 0; flex-wrap: wrap; }
+.pxl-mode-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 16px;
+  border: 1px solid #dadada;
+  background: #fff;
+  cursor: pointer;
+  text-align: center;
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+  border-radius: 1px;
+}
+.pxl-mode-btn:hover { border-color: #1451eb; color: #1451eb; }
+.pxl-mode-btn.active { background: #1451eb; color: #fff; border-color: #1451eb; }
+
+/* ---- Main layout ---- */
+.pxl-main {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+@media (max-width: 860px) {
+  .pxl-main { grid-template-columns: 1fr; }
+}
+
+.pxl-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 700px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.pxl-controls::-webkit-scrollbar { width: 4px; }
+.pxl-controls::-webkit-scrollbar-thumb { background: #dadada; border-radius: 2px; }
+
+/* ---- Preview canvas ---- */
+.pxl-preview-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pxl-preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border: 1px solid #dadada;
+  border-bottom: none;
+  border-radius: 1px 1px 0 0;
+  flex-wrap: wrap;
+}
+.pxl-zoom-label {
+  font-size: 0.75rem;
+  color: #888;
+  font-family: 'Roboto Mono', monospace;
+  min-width: 42px;
+  text-align: center;
+}
+
+.pxl-preview-wrap {
+  position: relative;
+  background: #fff;
+  border: 1px solid #dadada;
+  border-radius: 0 0 1px 1px;
+  min-height: 400px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pxl-preview-wrap canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+}
+
+.pxl-preview-wrap .pxl-processing {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.75rem;
+  color: #999;
+  background: rgba(255,255,255,0.85);
+  padding: 4px 10px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.pxl-preview-placeholder {
+  color: #bbb;
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 40px;
+}
+
+/* ---- Control groups ---- */
+.pxl-group {
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.pxl-group-header {
+  padding: 10px 14px;
+  background: #fafafa;
+  border-bottom: 1px solid #dadada;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+.pxl-group-header::after {
+  content: '\25BE';
+  font-size: 0.7rem;
+  color: #999;
+  transition: transform 0.2s;
+}
+.pxl-group.collapsed .pxl-group-header::after { transform: rotate(-90deg); }
+.pxl-group.collapsed .pxl-group-body { display: none; }
+.pxl-group-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---- Sliders ---- */
+.pxl-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pxl-slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #666;
+}
+.pxl-slider-label span:last-child {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.75rem;
+  color: #1a1a1a;
+}
+
+input[type="range"].pxl-range {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #dadada;
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"].pxl-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1451eb;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #1451eb;
+}
+input[type="range"].pxl-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1451eb;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #1451eb;
+}
+input[type="range"].pxl-range:focus {
+  outline: 2px solid rgba(20, 81, 235, 0.3);
+  outline-offset: 2px;
+}
+
+/* ---- Select ---- */
+.pxl-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  background: #fff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.82rem;
+  color: #1a1a1a;
+  outline: none;
+  cursor: pointer;
+}
+.pxl-select:focus { border-color: #1451eb; }
+
+/* ---- Palette swatches ---- */
+.pxl-palette-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.pxl-palette-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.pxl-palette-swatch:hover { transform: scale(1.2); }
+
+.pxl-custom-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pxl-custom-row input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+}
+.pxl-custom-row .form-field {
+  flex: 1;
+  min-width: 80px;
+}
+
+/* ---- Toggle / Checkbox ---- */
+.pxl-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #666;
+  cursor: pointer;
+}
+.pxl-toggle input {
+  accent-color: #1451eb;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* ---- Export bar ---- */
+.pxl-export-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---- ASCII preview (rendered to canvas, this is for TXT fallback) ---- */
+.pxl-ascii-pre {
+  background: #1a1a1a;
+  color: #33ff33;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 3px;
+  line-height: 1;
+  white-space: pre;
+  overflow: auto;
+  padding: 8px;
+  max-height: 600px;
+  width: 100%;
+  border: 1px solid #dadada;
+  border-radius: 1px;
+  display: none;
+}
+
+/* ---- Tooltip ---- */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ---- Utility ---- */
+.pxl-hidden { display: none !important; }

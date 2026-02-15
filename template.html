@@ -1,0 +1,214 @@
+<!-- ============================================================
+     Pixel, ASCII & Dither Art Generator — Blauw Films
+     HTML Structure
+     ============================================================ -->
+<div class="pxl-gen" id="pxlGen">
+  <div class="pxl-wrap">
+    <h4 class="h4-rich-text-title">Pixel, ASCII &amp; Dither Art Generator</h4>
+    <p class="rich-text-blauw-films pxl-subtitle">Upload an image and transform it into pixel art, ASCII art, or dither art with real-time controls.</p>
+
+    <!-- Upload -->
+    <div class="pxl-upload" id="pxlUpload">
+      <div class="pxl-upload-icon">&#11014;</div>
+      <p class="rich-text-blauw-films">Drop an image here or click to upload</p>
+      <p class="rich-text-blauw-films" style="font-size:.75rem;color:#aaa;margin-top:4px">JPG, PNG, WebP, AVIF</p>
+      <input type="file" id="pxlFileInput" accept="image/jpeg,image/png,image/webp,image/avif">
+    </div>
+    <div class="pxl-file-info pxl-hidden" id="pxlFileInfo">
+      <span id="pxlFileName"></span>
+      <span id="pxlFileRes"></span>
+      <span id="pxlFileSize"></span>
+      <button class="dash_button sm secondary" id="pxlRemoveBtn">Remove</button>
+    </div>
+
+    <!-- Mode selector -->
+    <div class="pxl-modes pxl-hidden" id="pxlModes">
+      <button class="pxl-mode-btn active" data-mode="pixel">Pixel Art</button>
+      <button class="pxl-mode-btn" data-mode="ascii">ASCII Art</button>
+      <button class="pxl-mode-btn" data-mode="dither">Dither Art</button>
+    </div>
+
+    <!-- Main layout -->
+    <div class="pxl-main pxl-hidden" id="pxlMain">
+      <!-- Controls panel -->
+      <div class="pxl-controls">
+
+        <!-- PIXEL ART CONTROLS -->
+        <div id="ctrlPixel">
+          <div class="pxl-group">
+            <div class="pxl-group-header">Pixel Settings</div>
+            <div class="pxl-group-body">
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Pixel Size</span><span id="valPixelSize">8</span></label>
+                <input type="range" class="pxl-range" id="sldPixelSize" min="2" max="40" value="8">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Brightness</span><span id="valPxBright">0</span></label>
+                <input type="range" class="pxl-range" id="sldPxBright" min="-100" max="100" value="0">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Contrast</span><span id="valPxContrast">0</span></label>
+                <input type="range" class="pxl-range" id="sldPxContrast" min="-100" max="100" value="0">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Saturation</span><span id="valPxSat">100</span></label>
+                <input type="range" class="pxl-range" id="sldPxSat" min="0" max="200" value="100">
+              </div>
+            </div>
+          </div>
+          <div class="pxl-group">
+            <div class="pxl-group-header">Color Palette</div>
+            <div class="pxl-group-body">
+              <select class="pxl-select" id="selPxPalette">
+                <option value="none">Full Color (No Palette)</option>
+                <option value="gameboy">Game Boy (DMG)</option>
+                <option value="gbc">Game Boy Color</option>
+                <option value="gba">Game Boy Advance</option>
+                <option value="nes">NES</option>
+                <option value="snes">SNES</option>
+                <option value="genesis">Sega Genesis</option>
+                <option value="c64">Commodore 64</option>
+                <option value="pico8">PICO-8</option>
+                <option value="custom">Custom Palette</option>
+              </select>
+              <div class="pxl-palette-grid" id="pxlPalettePreview"></div>
+              <div id="pxlCustomPalette" class="pxl-hidden">
+                <div class="pxl-custom-row">
+                  <input type="color" id="pxlCustomColor" value="#ff0000">
+                  <input type="text" class="form-field" id="pxlCustomHex" value="#ff0000" placeholder="#hex" style="max-width:100px">
+                  <button class="dash_button sm" id="pxlAddColor">Add</button>
+                </div>
+                <div class="pxl-palette-grid" id="pxlCustomColors" style="margin-top:8px"></div>
+                <button class="dash_button sm danger" id="pxlClearCustom" style="margin-top:6px">Clear All</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ASCII ART CONTROLS -->
+        <div id="ctrlAscii" class="pxl-hidden">
+          <div class="pxl-group">
+            <div class="pxl-group-header">ASCII Settings</div>
+            <div class="pxl-group-body">
+              <label class="rich-text-blauw-films" style="font-size:.78rem">Preset</label>
+              <select class="pxl-select" id="selAsciiPreset">
+                <option value="standard">Standard</option>
+                <option value="dense">Dense</option>
+                <option value="minimal">Minimal</option>
+                <option value="blocks">Blocks</option>
+                <option value="braille">Braille</option>
+                <option value="technical">Technical</option>
+                <option value="matrix">Matrix</option>
+                <option value="hatching">Hatching</option>
+              </select>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Cell Size</span><span id="valAsciiCell">6</span></label>
+                <input type="range" class="pxl-range" id="sldAsciiCell" min="2" max="16" value="6">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Brightness</span><span id="valAsBright">0</span></label>
+                <input type="range" class="pxl-range" id="sldAsBright" min="-100" max="100" value="0">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Contrast</span><span id="valAsContrast">0</span></label>
+                <input type="range" class="pxl-range" id="sldAsContrast" min="-100" max="100" value="0">
+              </div>
+              <div class="pxl-slider-row" data-tooltip="Edge sensitivity">
+                <label class="pxl-slider-label"><span>Detail</span><span id="valAsDetail">50</span></label>
+                <input type="range" class="pxl-range" id="sldAsDetail" min="0" max="100" value="50">
+              </div>
+              <label class="pxl-toggle"><input type="checkbox" id="chkAsciiInvert"> Invert</label>
+              <label class="pxl-toggle"><input type="checkbox" id="chkAsciiBW"> Black &amp; White</label>
+              <label class="pxl-toggle"><input type="checkbox" id="chkAsciiRotate"> Rotate Characters</label>
+              <label class="pxl-toggle"><input type="checkbox" id="chkAsciiMixed"> Mixed Density</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- DITHER ART CONTROLS -->
+        <div id="ctrlDither" class="pxl-hidden">
+          <div class="pxl-group">
+            <div class="pxl-group-header">Dither Settings</div>
+            <div class="pxl-group-body">
+              <label class="rich-text-blauw-films" style="font-size:.78rem">Algorithm</label>
+              <select class="pxl-select" id="selDitherAlgo">
+                <option value="floydsteinberg">Floyd&#8211;Steinberg</option>
+                <option value="atkinson">Atkinson</option>
+                <option value="jarvis">Jarvis&#8211;Judice&#8211;Ninke</option>
+                <option value="stucki">Stucki</option>
+                <option value="burkes">Burkes</option>
+                <option value="sierra">Sierra</option>
+                <option value="sierralite">Sierra Lite</option>
+              </select>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Point Size</span><span id="valDitherPt">1</span></label>
+                <input type="range" class="pxl-range" id="sldDitherPt" min="1" max="8" value="1">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Threshold</span><span id="valDitherTh">128</span></label>
+                <input type="range" class="pxl-range" id="sldDitherTh" min="0" max="255" value="128">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Brightness</span><span id="valDtBright">0</span></label>
+                <input type="range" class="pxl-range" id="sldDtBright" min="-100" max="100" value="0">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Contrast</span><span id="valDtContrast">0</span></label>
+                <input type="range" class="pxl-range" id="sldDtContrast" min="-100" max="100" value="0">
+              </div>
+              <div class="pxl-slider-row">
+                <label class="pxl-slider-label"><span>Detail</span><span id="valDtDetail">50</span></label>
+                <input type="range" class="pxl-range" id="sldDtDetail" min="0" max="100" value="50">
+              </div>
+            </div>
+          </div>
+          <div class="pxl-group">
+            <div class="pxl-group-header">Dither Palette</div>
+            <div class="pxl-group-body">
+              <select class="pxl-select" id="selDtPalette">
+                <option value="bw">Black &amp; White</option>
+                <option value="mac">Early Macintosh</option>
+                <option value="newspaper">Newspaper Halftone</option>
+                <option value="print">Print CMYK</option>
+                <option value="gameboy">Game Boy (DMG)</option>
+                <option value="c64">Commodore 64</option>
+                <option value="pico8">PICO-8</option>
+                <option value="custom">Custom Palette</option>
+              </select>
+              <div class="pxl-palette-grid" id="dtPalettePreview"></div>
+              <div id="dtCustomPalette" class="pxl-hidden">
+                <div class="pxl-custom-row">
+                  <input type="color" id="dtCustomColor" value="#ff0000">
+                  <input type="text" class="form-field" id="dtCustomHex" value="#ff0000" placeholder="#hex" style="max-width:100px">
+                  <button class="dash_button sm" id="dtAddColor">Add</button>
+                </div>
+                <div class="pxl-palette-grid" id="dtCustomColors" style="margin-top:8px"></div>
+                <button class="dash_button sm danger" id="dtClearCustom" style="margin-top:6px">Clear All</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Preview area -->
+      <div class="pxl-preview-area">
+        <div class="pxl-preview-toolbar">
+          <button class="dash_button sm secondary icon-btn" id="btnZoomOut" data-tooltip="Zoom out">&#8722;</button>
+          <span class="pxl-zoom-label" id="zoomLabel">Fit</span>
+          <button class="dash_button sm secondary icon-btn" id="btnZoomIn" data-tooltip="Zoom in">+</button>
+          <button class="dash_button sm secondary" id="btnZoomFit" style="margin-left:4px">Fit</button>
+        </div>
+        <div class="pxl-preview-wrap" id="pxlPreviewWrap">
+          <canvas id="pxlCanvas" style="display:none"></canvas>
+          <div class="pxl-preview-placeholder" id="pxlPlaceholder">Adjust controls to generate preview</div>
+          <div class="pxl-processing pxl-hidden" id="pxlProcessing">Processing&hellip;</div>
+        </div>
+        <div class="pxl-export-bar" id="pxlExportBar">
+          <button class="dash_button" id="btnExportPng">Download PNG</button>
+          <button class="dash_button secondary pxl-hidden" id="btnExportTxt">Download TXT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
