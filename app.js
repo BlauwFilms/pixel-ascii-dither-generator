@@ -12,7 +12,6 @@
   /* ---- State ---- */
   let srcImg = null;
   let mode = 'pixel';
-  let zoom = 1; // 1 = fit-to-container
   let lastAsciiText = '';
   let lastResultCanvas = null;
   let customPxColors = [];
@@ -20,8 +19,17 @@
   let renderPending = false;
   let debounceTimer = null;
 
-  // Preview fit size: we render at full res, then display scaled
-  const MAX_PREVIEW_DIM = 4096; // generous; zoom handles display
+  /* ---- Pan / Zoom state ---- */
+  let zoom = 1;
+  let fitScale = 1;
+  let panX = 0;
+  let panY = 0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragStartPanX = 0;
+  let dragStartPanY = 0;
+  let needsFit = true;
 
   /* ---- DOM shortcuts ---- */
   const $ = (id) => document.getElementById(id);
@@ -38,6 +46,7 @@
     modes: $('pxlModes'),
     main: $('pxlMain'),
     previewCanvas: $('pxlCanvas'),
+    previewInner: $('pxlPreviewInner'),
     placeholder: $('pxlPlaceholder'),
     processing: $('pxlProcessing'),
     previewWrap: $('pxlPreviewWrap'),
@@ -48,7 +57,6 @@
     zoomOut: $('btnZoomOut'),
     zoomFit: $('btnZoomFit'),
     zoomLabel: $('zoomLabel'),
-    // Pixel
     ctrlPixel: $('ctrlPixel'),
     sldPixelSize: $('sldPixelSize'),
     sldPxBright: $('sldPxBright'),
@@ -62,7 +70,6 @@
     pxAddColor: $('pxlAddColor'),
     pxCustomColors: $('pxlCustomColors'),
     pxClearCustom: $('pxlClearCustom'),
-    // ASCII
     ctrlAscii: $('ctrlAscii'),
     selAsciiPreset: $('selAsciiPreset'),
     sldAsciiCell: $('sldAsciiCell'),
@@ -73,7 +80,6 @@
     chkAsciiBW: $('chkAsciiBW'),
     chkAsciiRotate: $('chkAsciiRotate'),
     chkAsciiMixed: $('chkAsciiMixed'),
-    // Dither
     ctrlDither: $('ctrlDither'),
     selDitherAlgo: $('selDitherAlgo'),
     sldDitherPt: $('sldDitherPt'),
@@ -98,8 +104,8 @@
     return (b / 1048576).toFixed(1) + ' MB';
   }
 
-  function show(elem) { elem.classList.remove('pxl-hidden'); }
-  function hide(elem) { elem.classList.add('pxl-hidden'); }
+  function show(elem) { if (elem) elem.classList.remove('pxl-hidden'); }
+  function hide(elem) { if (elem) elem.classList.add('pxl-hidden'); }
   function toggle(elem, visible) { visible ? show(elem) : hide(elem); }
 
   /* ---- Palette swatches ---- */
@@ -129,60 +135,144 @@
     });
   }
 
-  /* ---- Zoom ---- */
-  function updateZoom() {
-    if (!lastResultCanvas) return;
-    const wrapW = el.previewWrap.clientWidth;
-    const wrapH = el.previewWrap.clientHeight || 500;
+  /* ============================================================
+     PAN / ZOOM
+     Uses CSS transform on the canvas. Preview container clips.
+     ============================================================ */
+
+  function computeFitScale() {
+    if (!lastResultCanvas) return 1;
+    const wrapRect = el.previewWrap.getBoundingClientRect();
+    const wW = wrapRect.width;
+    const wH = wrapRect.height;
     const cW = lastResultCanvas.width;
     const cH = lastResultCanvas.height;
+    if (cW === 0 || cH === 0) return 1;
+    var pad = 16;
+    var scX = (wW - pad) / cW;
+    var scY = (wH - pad) / cH;
+    return Math.min(scX, scY);
+  }
 
-    if (zoom <= 0) {
-      // Fit mode: scale to fit container
-      const scaleX = wrapW / cW;
-      const scaleY = wrapH / cH;
-      zoom = Math.min(scaleX, scaleY, 1); // don't upscale beyond 100%
-    }
+  function centerCanvas() {
+    if (!lastResultCanvas) return;
+    var wrapRect = el.previewWrap.getBoundingClientRect();
+    var wW = wrapRect.width;
+    var wH = wrapRect.height;
+    var cW = lastResultCanvas.width * zoom;
+    var cH = lastResultCanvas.height * zoom;
+    panX = (wW - cW) / 2;
+    panY = (wH - cH) / 2;
+  }
 
-    const dispW = Math.round(cW * zoom);
-    const dispH = Math.round(cH * zoom);
-
-    el.previewCanvas.style.width = dispW + 'px';
-    el.previewCanvas.style.height = dispH + 'px';
+  function applyTransform() {
+    el.previewCanvas.style.transform =
+      'translate(' + panX + 'px, ' + panY + 'px) scale(' + zoom + ')';
     el.zoomLabel.textContent = Math.round(zoom * 100) + '%';
   }
 
-  function zoomIn() {
-    zoom = Math.min((zoom > 0 ? zoom : 0.5) * 1.25, 4);
-    updateZoom();
+  function doFit() {
+    fitScale = computeFitScale();
+    zoom = fitScale;
+    centerCanvas();
+    applyTransform();
   }
 
-  function zoomOut() {
-    zoom = Math.max((zoom > 0 ? zoom : 0.5) * 0.8, 0.05);
-    updateZoom();
+  function zoomAroundPoint(cx, cy, factor) {
+    var oldZoom = zoom;
+    zoom = Math.max(0.02, Math.min(10, zoom * factor));
+    panX = cx - (cx - panX) * (zoom / oldZoom);
+    panY = cy - (cy - panY) * (zoom / oldZoom);
+    applyTransform();
   }
 
-  function zoomFit() {
-    zoom = 0; // signal fit mode
-    updateZoom();
+  function doZoomIn() {
+    var r = el.previewWrap.getBoundingClientRect();
+    zoomAroundPoint(r.width / 2, r.height / 2, 1.25);
   }
+
+  function doZoomOut() {
+    var r = el.previewWrap.getBoundingClientRect();
+    zoomAroundPoint(r.width / 2, r.height / 2, 0.8);
+  }
+
+  /* ---- Mouse drag ---- */
+  el.previewWrap.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragStartPanX = panX;
+    dragStartPanY = panY;
+    el.previewWrap.classList.add('is-dragging');
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', function (e) {
+    if (!isDragging) return;
+    panX = dragStartPanX + (e.clientX - dragStartX);
+    panY = dragStartPanY + (e.clientY - dragStartY);
+    applyTransform();
+  });
+
+  window.addEventListener('mouseup', function () {
+    if (isDragging) {
+      isDragging = false;
+      el.previewWrap.classList.remove('is-dragging');
+    }
+  });
+
+  /* ---- Touch drag ---- */
+  el.previewWrap.addEventListener('touchstart', function (e) {
+    if (e.touches.length === 1) {
+      isDragging = true;
+      dragStartX = e.touches[0].clientX;
+      dragStartY = e.touches[0].clientY;
+      dragStartPanX = panX;
+      dragStartPanY = panY;
+    }
+  }, { passive: true });
+
+  window.addEventListener('touchmove', function (e) {
+    if (!isDragging || e.touches.length !== 1) return;
+    panX = dragStartPanX + (e.touches[0].clientX - dragStartX);
+    panY = dragStartPanY + (e.touches[0].clientY - dragStartY);
+    applyTransform();
+  }, { passive: true });
+
+  window.addEventListener('touchend', function () { isDragging = false; });
+
+  /* ---- Wheel zoom ---- */
+  el.previewWrap.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var rect = el.previewWrap.getBoundingClientRect();
+    var cx = e.clientX - rect.left;
+    var cy = e.clientY - rect.top;
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    zoomAroundPoint(cx, cy, factor);
+  }, { passive: false });
 
   /* ---- Display result ---- */
   function displayResult(canvas) {
     lastResultCanvas = canvas;
 
-    // Copy result to the visible canvas element
     el.previewCanvas.width = canvas.width;
     el.previewCanvas.height = canvas.height;
-    const ctx = el.previewCanvas.getContext('2d');
+    var ctx = el.previewCanvas.getContext('2d');
     ctx.drawImage(canvas, 0, 0);
     el.previewCanvas.style.display = 'block';
+    // Clear any manual width/height — transform handles display sizing
+    el.previewCanvas.style.width = '';
+    el.previewCanvas.style.height = '';
 
-    // Auto-fit on first render or when in fit mode
-    if (zoom <= 0 || zoom === 1) {
-      zoom = 0;
+    if (needsFit) {
+      needsFit = false;
+      doFit();
+    } else {
+      // Keep current zoom/pan, just re-apply transform
+      applyTransform();
     }
-    updateZoom();
+
     hide(el.placeholder);
   }
 
@@ -191,11 +281,10 @@
     if (!srcImg) return;
     show(el.processing);
 
-    // Use rAF + setTimeout(0) to let the "Processing" indicator paint
-    requestAnimationFrame(() => {
-      setTimeout(() => {
+    requestAnimationFrame(function () {
+      setTimeout(function () {
         try {
-          let resultCanvas = null;
+          var resultCanvas = null;
 
           if (mode === 'pixel') {
             resultCanvas = Engine.renderPixelArt(srcImg, {
@@ -207,7 +296,7 @@
               customColors: customPxColors,
             });
           } else if (mode === 'ascii') {
-            const result = Engine.renderAsciiArt(srcImg, {
+            var result = Engine.renderAsciiArt(srcImg, {
               cellSize: parseInt(el.sldAsciiCell.value),
               brightness: parseInt(el.sldAsBright.value),
               contrast: parseInt(el.sldAsContrast.value),
@@ -245,39 +334,32 @@
 
   function scheduleRender() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      if (!renderPending) {
-        renderPending = true;
-        doRender();
-      }
+    debounceTimer = setTimeout(function () {
+      if (!renderPending) { renderPending = true; doRender(); }
     }, 120);
   }
 
-  // Faster schedule for non-heavy controls
   function scheduleRenderFast() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      if (!renderPending) {
-        renderPending = true;
-        doRender();
-      }
+    debounceTimer = setTimeout(function () {
+      if (!renderPending) { renderPending = true; doRender(); }
     }, 50);
   }
 
   /* ---- Image upload ---- */
   function loadImage(file) {
     if (!file) return;
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
-    if (!validTypes.includes(file.type)) {
+    var validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+    if (validTypes.indexOf(file.type) === -1) {
       alert('Unsupported format. Please upload JPG, PNG, WebP, or AVIF.');
       return;
     }
-    const reader = new FileReader();
-    reader.onerror = () => alert('Could not read file. It may be corrupted.');
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = () => alert('Could not decode image. It may be corrupted.');
-      img.onload = () => {
+    var reader = new FileReader();
+    reader.onerror = function () { alert('Could not read file. It may be corrupted.'); };
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onerror = function () { alert('Could not decode image. It may be corrupted.'); };
+      img.onload = function () {
         srcImg = img;
         el.fileName.textContent = file.name;
         el.fileRes.textContent = img.naturalWidth + '\u00d7' + img.naturalHeight;
@@ -286,7 +368,7 @@
         hide(el.upload);
         show(el.modes);
         show(el.main);
-        zoom = 0; // fit
+        needsFit = true;
         scheduleRenderFast();
       };
       img.src = e.target.result;
@@ -305,14 +387,15 @@
     el.previewCanvas.style.display = 'none';
     show(el.placeholder);
     el.fileInput.value = '';
+    needsFit = true;
   }
 
-  /* ---- Bind slider with value display ---- */
+  /* ---- Bind slider ---- */
   function bindSlider(sliderId, displayId, fast) {
-    const slider = $(sliderId);
-    const display = $(displayId);
+    var slider = $(sliderId);
+    var display = $(displayId);
     if (!slider || !display) return;
-    slider.addEventListener('input', () => {
+    slider.addEventListener('input', function () {
       display.textContent = slider.value;
       if (fast) { scheduleRenderFast(); } else { scheduleRender(); }
     });
@@ -322,73 +405,72 @@
      EVENT BINDING
      ============================================================ */
 
-  /* ---- Upload ---- */
-  el.upload.addEventListener('click', (e) => {
+  /* Upload */
+  el.upload.addEventListener('click', function (e) {
     if (e.target === el.fileInput) return;
     el.fileInput.click();
   });
-  el.fileInput.addEventListener('click', (e) => e.stopPropagation());
-  el.fileInput.addEventListener('change', (e) => {
+  el.fileInput.addEventListener('click', function (e) { e.stopPropagation(); });
+  el.fileInput.addEventListener('change', function (e) {
     if (e.target.files[0]) loadImage(e.target.files[0]);
   });
-  el.upload.addEventListener('dragover', (e) => {
+  el.upload.addEventListener('dragover', function (e) {
     e.preventDefault();
     el.upload.classList.add('dragover');
   });
-  el.upload.addEventListener('dragleave', () => {
+  el.upload.addEventListener('dragleave', function () {
     el.upload.classList.remove('dragover');
   });
-  el.upload.addEventListener('drop', (e) => {
+  el.upload.addEventListener('drop', function (e) {
     e.preventDefault();
     el.upload.classList.remove('dragover');
     if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
   });
   el.removeBtn.addEventListener('click', removeImage);
 
-  /* ---- Mode switching ---- */
-  document.querySelectorAll('.pxl-mode-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.pxl-mode-btn').forEach(b => b.classList.remove('active'));
+  /* Mode switching — preserves zoom/pan */
+  document.querySelectorAll('.pxl-mode-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.pxl-mode-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       mode = btn.dataset.mode;
       toggle(el.ctrlPixel, mode === 'pixel');
       toggle(el.ctrlAscii, mode === 'ascii');
       toggle(el.ctrlDither, mode === 'dither');
       toggle(el.btnTxt, mode === 'ascii');
-      zoom = 0; // re-fit on mode switch
       scheduleRenderFast();
     });
   });
 
-  /* ---- Collapsible groups ---- */
-  document.querySelectorAll('.pxl-group-header').forEach((h) => {
-    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  /* Collapsible groups */
+  document.querySelectorAll('.pxl-group-header').forEach(function (h) {
+    h.addEventListener('click', function () { h.parentElement.classList.toggle('collapsed'); });
   });
 
-  /* ---- Zoom controls ---- */
-  el.zoomIn.addEventListener('click', zoomIn);
-  el.zoomOut.addEventListener('click', zoomOut);
-  el.zoomFit.addEventListener('click', zoomFit);
+  /* Zoom controls */
+  el.zoomIn.addEventListener('click', doZoomIn);
+  el.zoomOut.addEventListener('click', doZoomOut);
+  el.zoomFit.addEventListener('click', function () { doFit(); });
 
-  /* ---- Pixel Art sliders ---- */
+  /* Pixel sliders */
   bindSlider('sldPixelSize', 'valPixelSize', false);
   bindSlider('sldPxBright', 'valPxBright', true);
   bindSlider('sldPxContrast', 'valPxContrast', true);
   bindSlider('sldPxSat', 'valPxSat', true);
 
-  /* ---- ASCII sliders ---- */
+  /* ASCII sliders */
   bindSlider('sldAsciiCell', 'valAsciiCell', false);
   bindSlider('sldAsBright', 'valAsBright', true);
   bindSlider('sldAsContrast', 'valAsContrast', true);
   bindSlider('sldAsDetail', 'valAsDetail', true);
 
-  /* ---- ASCII checkboxes ---- */
-  [el.chkAsciiInvert, el.chkAsciiBW, el.chkAsciiRotate, el.chkAsciiMixed].forEach(c => {
+  /* ASCII checkboxes */
+  [el.chkAsciiInvert, el.chkAsciiBW, el.chkAsciiRotate, el.chkAsciiMixed].forEach(function (c) {
     if (c) c.addEventListener('change', scheduleRenderFast);
   });
   el.selAsciiPreset.addEventListener('change', scheduleRenderFast);
 
-  /* ---- Dither sliders ---- */
+  /* Dither sliders */
   bindSlider('sldDitherPt', 'valDitherPt', false);
   bindSlider('sldDitherTh', 'valDitherTh', false);
   bindSlider('sldDtBright', 'valDtBright', true);
@@ -396,91 +478,108 @@
   bindSlider('sldDtDetail', 'valDtDetail', true);
   el.selDitherAlgo.addEventListener('change', scheduleRender);
 
-  /* ---- Pixel palette ---- */
-  el.selPxPalette.addEventListener('change', () => {
-    const v = el.selPxPalette.value;
+  /* Pixel palette */
+  el.selPxPalette.addEventListener('change', function () {
+    var v = el.selPxPalette.value;
     showPaletteSwatches(el.pxPalettePreview, v);
     toggle(el.pxCustomPalette, v === 'custom');
     scheduleRender();
   });
 
-  /* ---- Dither palette ---- */
-  el.selDtPalette.addEventListener('change', () => {
-    const v = el.selDtPalette.value;
+  /* Dither palette */
+  el.selDtPalette.addEventListener('change', function () {
+    var v = el.selDtPalette.value;
     showPaletteSwatches(el.dtPalettePreview, v);
     toggle(el.dtCustomPalette, v === 'custom');
     scheduleRender();
   });
 
-  /* ---- Custom color sync ---- */
-  el.pxCustomColor.addEventListener('input', () => { el.pxCustomHex.value = el.pxCustomColor.value; });
-  el.pxCustomHex.addEventListener('input', () => {
+  /* Custom color sync */
+  el.pxCustomColor.addEventListener('input', function () { el.pxCustomHex.value = el.pxCustomColor.value; });
+  el.pxCustomHex.addEventListener('input', function () {
     if (/^#[0-9a-f]{6}$/i.test(el.pxCustomHex.value)) el.pxCustomColor.value = el.pxCustomHex.value;
   });
-  el.dtCustomColor.addEventListener('input', () => { el.dtCustomHex.value = el.dtCustomColor.value; });
-  el.dtCustomHex.addEventListener('input', () => {
+  el.dtCustomColor.addEventListener('input', function () { el.dtCustomHex.value = el.dtCustomColor.value; });
+  el.dtCustomHex.addEventListener('input', function () {
     if (/^#[0-9a-f]{6}$/i.test(el.dtCustomHex.value)) el.dtCustomColor.value = el.dtCustomHex.value;
   });
 
-  /* ---- Custom palette: Pixel ---- */
-  el.pxAddColor.addEventListener('click', () => {
-    const c = el.pxCustomColor.value;
-    if (!customPxColors.includes(c)) {
+  /* Custom palette: Pixel */
+  function refreshPxSwatches() {
+    renderCustomSwatches(el.pxCustomColors, customPxColors, function (i) {
+      customPxColors.splice(i, 1);
+      refreshPxSwatches();
+      scheduleRender();
+    });
+  }
+  el.pxAddColor.addEventListener('click', function () {
+    var c = el.pxCustomColor.value;
+    if (customPxColors.indexOf(c) === -1) {
       customPxColors.push(c);
-      renderCustomSwatches(el.pxCustomColors, customPxColors, (i) => {
-        customPxColors.splice(i, 1);
-        renderCustomSwatches(el.pxCustomColors, customPxColors, arguments.callee);
-        scheduleRender();
-      });
+      refreshPxSwatches();
       scheduleRender();
     }
   });
-  el.pxClearCustom.addEventListener('click', () => {
+  el.pxClearCustom.addEventListener('click', function () {
     customPxColors = [];
     el.pxCustomColors.innerHTML = '';
     scheduleRender();
   });
 
-  /* ---- Custom palette: Dither ---- */
-  el.dtAddColor.addEventListener('click', () => {
-    const c = el.dtCustomColor.value;
-    if (!customDtColors.includes(c)) {
+  /* Custom palette: Dither */
+  function refreshDtSwatches() {
+    renderCustomSwatches(el.dtCustomColors, customDtColors, function (i) {
+      customDtColors.splice(i, 1);
+      refreshDtSwatches();
+      scheduleRender();
+    });
+  }
+  el.dtAddColor.addEventListener('click', function () {
+    var c = el.dtCustomColor.value;
+    if (customDtColors.indexOf(c) === -1) {
       customDtColors.push(c);
-      renderCustomSwatches(el.dtCustomColors, customDtColors, (i) => {
-        customDtColors.splice(i, 1);
-        renderCustomSwatches(el.dtCustomColors, customDtColors, arguments.callee);
-        scheduleRender();
-      });
+      refreshDtSwatches();
       scheduleRender();
     }
   });
-  el.dtClearCustom.addEventListener('click', () => {
+  el.dtClearCustom.addEventListener('click', function () {
     customDtColors = [];
     el.dtCustomColors.innerHTML = '';
     scheduleRender();
   });
 
-  /* ---- Export ---- */
-  el.btnPng.addEventListener('click', () => {
+  /* Export */
+  el.btnPng.addEventListener('click', function () {
     if (!lastResultCanvas) return;
-    const a = document.createElement('a');
-    const names = { pixel: 'pixel-art', ascii: 'ascii-art', dither: 'dither-art' };
+    var a = document.createElement('a');
+    var names = { pixel: 'pixel-art', ascii: 'ascii-art', dither: 'dither-art' };
     a.download = (names[mode] || 'output') + '.png';
     a.href = lastResultCanvas.toDataURL('image/png');
     a.click();
   });
 
-  el.btnTxt.addEventListener('click', () => {
+  el.btnTxt.addEventListener('click', function () {
     if (!lastAsciiText) return;
-    const blob = new Blob([lastAsciiText], { type: 'text/plain' });
-    const a = document.createElement('a');
+    var blob = new Blob([lastAsciiText], { type: 'text/plain' });
+    var a = document.createElement('a');
     a.download = 'ascii-art.txt';
     a.href = URL.createObjectURL(blob);
     a.click();
     URL.revokeObjectURL(a.href);
   });
 
-  /* ---- Init ---- */
+  /* Window resize: re-fit if currently at fit scale */
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      if (lastResultCanvas && Math.abs(zoom - fitScale) < 0.01) {
+        doFit();
+      }
+    }, 200);
+  });
+
+  /* Init */
   showPaletteSwatches(el.pxPalettePreview, 'none');
 
 })();

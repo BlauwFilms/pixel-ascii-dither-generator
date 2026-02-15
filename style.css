@@ -177,6 +177,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0; /* prevent grid blowout */
 }
 
 .pxl-preview-toolbar {
@@ -203,17 +204,34 @@
   background: #fff;
   border: 1px solid #dadada;
   border-radius: 0 0 1px 1px;
-  min-height: 400px;
-  overflow: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 500px;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pxl-preview-wrap.is-dragging {
+  cursor: grabbing;
 }
 
-.pxl-preview-wrap canvas {
+.pxl-preview-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.pxl-preview-inner canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   display: block;
+  transform-origin: 0 0;
 }
 
 .pxl-preview-wrap .pxl-processing {
@@ -226,13 +244,19 @@
   padding: 4px 10px;
   border-radius: 2px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .pxl-preview-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   color: #bbb;
   font-size: 0.875rem;
   text-align: center;
   padding: 40px;
+  pointer-events: none;
 }
 
 /* ---- Control groups ---- */
